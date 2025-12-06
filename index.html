@@ -1,43 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temujin Nukenov</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+import React, { useState, useEffect } from 'react';
+import { Mail, ArrowRight, Copy, Check } from 'lucide-react';
+
+const App = () => {
+  const [copied, setCopied] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(true);
+
+  // The filename provided by the user
+  const logoSrc = "Logo Caligraphy No Backround — img — added2025-08-15.png";
+  const email = "info@nukenov.com";
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(email);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FDFDFD] text-gray-800 flex flex-col items-center justify-center p-6 selection:bg-orange-100 selection:text-orange-900 font-sans">
+      
+      {/* Main Content Container */}
+      <main className="w-full max-w-md flex flex-col items-center text-center space-y-12 animate-fade-in-up">
+        
+        {/* Logo Section */}
+        <div className="relative group">
+          <div className="absolute -inset-4 bg-gradient-to-tr from-orange-50 to-gray-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl"></div>
+          {imageLoaded ? (
+            <img 
+              src={logoSrc} 
+              alt="Nukenov Calligraphy Logo" 
+              className="relative w-48 md:w-56 h-auto object-contain drop-shadow-sm transition-transform duration-700 hover:scale-105"
+              onError={(e) => {
+                e.target.onerror = null; 
+                setImageLoaded(false);
+              }}
+            />
+          ) : (
+            // Fallback if image isn't found
+            <div className="relative w-48 h-48 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-full text-gray-400">
+              <span className="text-sm">Logo Not Found</span>
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="w-12 h-0.5 bg-gray-200 rounded-full"></div>
+
+        {/* Contact Section */}
+        <div className="flex flex-col items-center space-y-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-medium">
+            Contact
+          </p>
+          
+          <div className="relative group">
+            <a 
+              href={`mailto:${email}`}
+              className="flex items-center gap-3 text-lg md:text-xl font-light text-gray-800 hover:text-orange-600 transition-colors duration-300 border-b border-transparent hover:border-orange-200 pb-0.5"
+            >
+              <Mail className="w-5 h-5 stroke-1" />
+              <span>{email}</span>
+            </a>
+
+            {/* Copy Button (appears on hover/focus) */}
+            <button
+              onClick={handleCopy}
+              className="absolute -right-10 top-1/2 -translate-y-1/2 p-2 text-gray-300 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-all duration-300"
+              title="Copy email"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+      </main>
+
+      {/* Footer */}
+      <footer className="absolute bottom-6 text-gray-300 text-xs font-light tracking-wider">
+        &copy; {new Date().getFullYear()} NUKENOV
+      </footer>
+
+      {/* Custom Keyframes for Animation */}
+      <style jsx>{`
+        @keyframes fade-in-up {
+          0% {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
+        .animate-fade-in-up {
+          animation: fade-in-up 1s ease-out forwards;
         }
-        .container {
-            text-align: center;
-            padding: 2rem;
-        }
-        h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            font-weight: 700;
-        }
-        p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Temujin Nukenov</h1>
-        <p>Coming Soon</p>
+      `}</style>
     </div>
-</body>
-</html>
+  );
+};
+
+export default App;
