@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteURL — Заметки в URL</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg: #0a0a0a;
+            --text: #e0e0e0;
+            --accent: #00d4aa;
+            --border: #333;
+        }
+        
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .logo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        
+        .logo span {
+            color: var(--text);
+            opacity: 0.5;
+        }
+        
+        .stats {
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        button {
+            background: var(--border);
+            color: var(--text);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        
+        button.primary {
+            background: var(--accent);
+            color: var(--bg);
+        }
+        
+        button.primary:hover {
+            opacity: 0.8;
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            padding: 1rem;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 100%;
+            min-height: calc(100vh - 120px);
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+        }
+        
+        textarea:focus {
+            border-color: var(--accent);
+        }
+        
+        textarea::placeholder {
+            color: #555;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--accent);
+            color: var(--bg);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        footer {
+            padding: 1rem 2rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 0.75rem;
+            opacity: 0.5;
+        }
+        
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 600px) {
+            header {
+                padding: 1rem;
+            }
+            textarea {
+                padding: 1rem;
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">NoteURL <span>by Adam</span></div>
+        <div class="stats" id="stats">0 символов • 0 байт в URL</div>
+        <div class="actions">
+            <button onclick="clearNote()">Очистить</button>
+            <button onclick="copyURL()" class="primary">📋 Копировать URL</button>
+        </div>
+    </header>
+    
+    <main>
+        <textarea 
+            id="editor" 
+            placeholder="Пиши здесь... Текст автоматически сохраняется в URL ✨"
+            autofocus
+        ></textarea>
+    </main>
+    
+    <div class="toast" id="toast"></div>
+    
+    <footer>
+        Нет сервера • Нет базы данных • Всё в URL<br>
+        Inspired by <a href="https://github.com/antonmedv/textarea" target="_blank">textarea.my</a>
+    </footer>
+    
+    <script>
+        const editor = document.getElementById('editor');
+        const stats = document.getElementById('stats');
+        const toast = document.getElementById('toast');
+        
+        // Compress text using pako (deflate)
+        // Inline minimal deflate implementation
+        const compress = (str) => {
+            try {
+                const data = new TextEncoder().encode(str);
+                const cs = new CompressionStream('deflate-raw');
+                const writer = cs.writable.getWriter();
+                writer.write(data);
+                writer.close();
+                return new Response(cs.readable).arrayBuffer().then(buf => {
+                    return btoa(String.fromCharCode(...new Uint8Array(buf)))
+                        .replace(/\+/g, '-')
+                        .replace(/\//g, '_')
+                        .replace(/=+$/, '');
+                });
+            } catch (e) {
+                // Fallback to base64 if CompressionStream not available
+                return Promise.resolve(btoa(unescape(encodeURIComponent(str)))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/, ''));
+            }
+        };
+        
+        const decompress = async (encoded) => {
+            try {
+                // Restore base64
+                let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+                while (b64.length % 4) b64 += '=';
+                
+                const binary = atob(b64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                
+                try {
+                    const ds = new DecompressionStream('deflate-raw');
+                    const writer = ds.writable.getWriter();
+                    writer.write(bytes);
+                    writer.close();
+                    const result = await new Response(ds.readable).arrayBuffer();
+                    return new TextDecoder().decode(result);
+                } catch (e) {
+                    // Fallback: assume it's just base64
+                    return decodeURIComponent(escape(atob(b64)));
+                }
+            } catch (e) {
+                return '';
+            }
+        };
+        
+        // Update URL on text change
+        let updateTimeout;
+        editor.addEventListener('input', () => {
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(async () => {
+                const text = editor.value;
+                if (text) {
+                    const compressed = await compress(text);
+                    window.location.hash = compressed;
+                } else {
+                    window.location.hash = '';
+                }
+                updateStats();
+            }, 300);
+        });
+        
+        // Load from URL on page load
+        window.addEventListener('load', async () => {
+            const hash = window.location.hash.slice(1);
+            if (hash) {
+                const text = await decompress(hash);
+                editor.value = text;
+            }
+            updateStats();
+        });
+        
+        // Handle hash change (back/forward buttons)
+        window.addEventListener('hashchange', async () => {
+            const hash = window.location.hash.slice(1);
+            const text = hash ? await decompress(hash) : '';
+            if (editor.value !== text) {
+                editor.value = text;
+                updateStats();
+            }
+        });
+        
+        function updateStats() {
+            const chars = editor.value.length;
+            const urlBytes = window.location.href.length;
+            stats.textContent = `${chars.toLocaleString()} символов • ${urlBytes.toLocaleString()} байт в URL`;
+            
+            // Warning if URL too long
+            if (urlBytes > 2000) {
+                stats.style.color = urlBytes > 8000 ? '#ff6b6b' : '#ffd93d';
+            } else {
+                stats.style.color = '';
+            }
+        }
+        
+        function copyURL() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                showToast('✅ URL скопирован!');
+            }).catch(() => {
+                // Fallback
+                const input = document.createElement('input');
+                input.value = window.location.href;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast('✅ URL скопирован!');
+            });
+        }
+        
+        function clearNote() {
+            if (editor.value && !confirm('Очистить заметку?')) return;
+            editor.value = '';
+            window.location.hash = '';
+            updateStats();
+            editor.focus();
+        }
+        
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + S - copy URL
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                copyURL();
+            }
+            // Escape - clear
+            if (e.key === 'Escape' && !editor.value) {
+                clearNote();
+            }
+        });
+    </script>
+</body>
+</html>
